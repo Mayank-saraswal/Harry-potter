@@ -2,14 +2,17 @@ import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 
 import { createSandbox, getLanguageConfig } from "@/lib/e2b-sandbox";
+import { prisma } from "@/lib/prisma";
+import { readTextFile, isBinaryFile } from "@/lib/file-storage";
 import type { SandboxPreviewRequest, SandboxStreamEvent } from "@/types/sandbox";
 
 /**
  * POST /api/sandbox/preview
  *
- * Creates an E2B sandbox, writes project files, installs dependencies,
- * and runs the dev/start command.  Output is streamed as newline-delimited JSON
- * (each line is a `SandboxStreamEvent`).
+ * Creates an E2B sandbox, fetches project files from the database and Azure
+ * Blob Storage, writes them into the sandbox, installs dependencies, and runs
+ * the dev/start command.  Output is streamed as newline-delimited JSON (each
+ * line is a `SandboxStreamEvent`).
  */
 export async function POST(req: NextRequest): Promise<Response> {
     const { userId } = await auth();
@@ -24,10 +27,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { files } = body;
-    if (!files || typeof files !== "object" || Object.keys(files).length === 0) {
+    const { projectId } = body;
+    if (!projectId || typeof projectId !== "string") {
         return Response.json(
-            { error: "Missing or empty 'files' field" },
+            { error: "Missing or invalid 'projectId' field" },
             { status: 400 }
         );
     }
@@ -47,18 +50,38 @@ export async function POST(req: NextRequest): Promise<Response> {
                 const sandbox = await createSandbox();
                 send({ type: "sandboxId", sandboxId: sandbox.sandboxId });
 
-                // 2. Write project files
-                for (const [filePath, content] of Object.entries(files)) {
-                    await sandbox.files.write(`/code/${filePath}`, content);
-                }
+                // 2. Fetch project files from database
+                const dbFiles = await prisma.file.findMany({
+                    where: { projectId, type: "file" },
+                });
 
-                // 3. Detect language & commands
-                const detected = getLanguageConfig(files);
+                // 3. Download file contents from Azure Blob Storage
+                const filesContent: Record<string, string> = {};
+                await Promise.all(
+                    dbFiles.map(async (file) => {
+                        if (isBinaryFile(file.name)) {
+                            // Binary files: create an empty placeholder
+                            await sandbox.files.write(`/code/${file.path}`, "");
+                        } else {
+                            try {
+                                const content = await readTextFile(projectId, file.id);
+                                filesContent[file.path] = content;
+                                await sandbox.files.write(`/code/${file.path}`, content);
+                            } catch {
+                                // If download fails, touch an empty file so the structure exists
+                                await sandbox.files.write(`/code/${file.path}`, "");
+                            }
+                        }
+                    })
+                );
+
+                // 4. Detect language & commands
+                const detected = getLanguageConfig(filesContent);
                 const installCmd =
                     body.installCommand ?? detected.installCommand;
                 const devCmd = body.devCommand ?? detected.runCommand;
 
-                // 4. Install dependencies
+                // 5. Install dependencies
                 if (installCmd) {
                     send({ type: "status", status: "installing" });
                     send({ type: "output", data: `$ ${installCmd}\n` });
@@ -78,12 +101,11 @@ export async function POST(req: NextRequest): Promise<Response> {
                             message: `Install failed with exit code ${installResult.exitCode}`,
                         });
                         controller.close();
-                        await sandbox.kill();
                         return;
                     }
                 }
 
-                // 5. Run the project
+                // 6. Run the project
                 send({ type: "status", status: "running" });
                 send({ type: "output", data: `\n$ ${devCmd}\n` });
 
@@ -99,7 +121,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
                 send({ type: "exit", exitCode: runResult.exitCode });
 
-                // 6. Provide sandbox host URL for web projects
+                // 7. Provide sandbox host URL for web projects
                 try {
                     const url = sandbox.getHost(3000);
                     if (url) {
