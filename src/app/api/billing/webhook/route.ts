@@ -7,10 +7,19 @@ import { invalidateCache } from "@/lib/redis";
 export async function POST(request: Request) {
     const body = await request.text();
     const signature = request.headers.get("x-razorpay-signature") ?? "";
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET ?? "";
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+    // Reject if webhook secret is not configured
+    if (!webhookSecret) {
+        console.error("RAZORPAY_WEBHOOK_SECRET is not configured");
+        return NextResponse.json(
+            { error: "Webhook not configured" },
+            { status: 500 }
+        );
+    }
 
     // Verify signature
-    if (!verifyWebhookSignature(body, signature, webhookSecret)) {
+    if (!signature || !verifyWebhookSignature(body, signature, webhookSecret)) {
         return NextResponse.json(
             { error: "Invalid signature" },
             { status: 400 }

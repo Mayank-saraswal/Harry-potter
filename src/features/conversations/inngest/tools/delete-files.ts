@@ -31,6 +31,7 @@ export const createDeleteFilesTool = () => {
       const filesToDelete: {
         id: string;
         name: string;
+        path: string;
         type: string;
         projectId: string;
         blobPath: string | null;
@@ -39,7 +40,7 @@ export const createDeleteFilesTool = () => {
       for (const fileId of fileIds) {
         const file = await prisma.file.findUnique({
           where: { id: fileId },
-          select: { id: true, name: true, type: true, projectId: true, blobPath: true },
+          select: { id: true, name: true, path: true, type: true, projectId: true, blobPath: true },
         });
 
         if (!file) {
@@ -68,7 +69,7 @@ export const createDeleteFilesTool = () => {
               const children = await prisma.file.findMany({
                 where: {
                   projectId: file.projectId,
-                  path: { startsWith: `${file.name}/` },
+                  path: { startsWith: `${file.path}/` },
                 },
                 select: { id: true, blobPath: true },
               });
@@ -88,7 +89,7 @@ export const createDeleteFilesTool = () => {
               await prisma.file.deleteMany({
                 where: {
                   projectId: file.projectId,
-                  path: { startsWith: `${file.name}/` },
+                  path: { startsWith: `${file.path}/` },
                 },
               });
             }

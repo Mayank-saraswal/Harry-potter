@@ -2,8 +2,17 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { uploadTextFile } from "@/lib/file-storage";
+import { z } from "zod";
 
 type Params = { params: Promise<{ projectId: string }> };
+
+/**
+ * Validate that a path does not contain traversal sequences
+ */
+function isValidPath(path: string): boolean {
+    const normalized = path.replace(/\\/g, "/");
+    return !normalized.includes("..") && !normalized.startsWith("/");
+}
 
 /**
  * GET /api/projects/[projectId]/files — List all files in a project
@@ -19,6 +28,10 @@ export async function GET(request: Request, { params }: Params) {
     const url = new URL(request.url);
     const parentPath = url.searchParams.get("parentPath");
 
+    if (parentPath && !isValidPath(parentPath)) {
+        return NextResponse.json({ error: "Invalid path" }, { status: 400 });
+    }
+
     // Verify project ownership
     const project = await prisma.project.findFirst({
         where: { id: projectId, userId },
@@ -31,23 +44,19 @@ export async function GET(request: Request, { params }: Params) {
 
     let files;
     if (parentPath) {
-        // Get files within a specific folder
+        // Get direct children of the specified folder
         files = await prisma.file.findMany({
             where: {
                 projectId,
                 path: { startsWith: `${parentPath}/` },
-                // Only direct children (no sub-folder contents)
-                NOT: {
-                    path: { contains: `${parentPath}/`, },
-                },
             },
             orderBy: [{ type: "asc" }, { name: "asc" }],
         });
 
-        // Filter to direct children only
+        // Filter to direct children only (query results already start with parentPath/)
         files = files.filter((f: { path: string }) => {
-            const relativePath = f.path.replace(`${parentPath}/`, "");
-            return !relativePath.includes("/");
+            const relativePath = f.path.slice(parentPath.length + 1);
+            return relativePath.length > 0 && !relativePath.includes("/");
         });
     } else {
         // Get all files (flat list)
@@ -60,6 +69,13 @@ export async function GET(request: Request, { params }: Params) {
     return NextResponse.json(files);
 }
 
+const createFileSchema = z.object({
+    name: z.string().min(1).max(255),
+    content: z.string().optional(),
+    parentPath: z.string().max(500).optional(),
+    type: z.enum(["file", "folder"]).optional(),
+});
+
 /**
  * POST /api/projects/[projectId]/files — Create a file or folder
  */
@@ -70,7 +86,21 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const { projectId } = await params;
-    const { name, content, parentPath, type } = await request.json();
+    const body = await request.json();
+    const parsed = createFileSchema.safeParse(body);
+    if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const { name, content, parentPath, type } = parsed.data;
+
+    // Path traversal protection
+    if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+        return NextResponse.json({ error: "Invalid file name" }, { status: 400 });
+    }
+    if (parentPath && !isValidPath(parentPath)) {
+        return NextResponse.json({ error: "Invalid parent path" }, { status: 400 });
+    }
 
     // Verify project ownership
     const project = await prisma.project.findFirst({

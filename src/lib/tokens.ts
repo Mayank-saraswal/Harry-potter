@@ -113,18 +113,28 @@ export async function deductTokens(params: {
     const morisTokens = calculateMorisTokens(model, promptTokens, completionTokens);
     const multiplier = getModelMultiplier(model);
 
-    // Deduct + log in a transaction
-    await prisma.$transaction([
-        // Decrement balance
-        prisma.userSubscription.update({
+    // Deduct + log in a transaction, ensuring balance doesn't go below zero
+    await prisma.$transaction(async (tx) => {
+        const sub = await tx.userSubscription.findUnique({
+            where: { userId },
+            select: { tokenBalance: true },
+        });
+
+        if (!sub) {
+            throw new Error("User subscription not found");
+        }
+
+        const actualDeduction = sub.tokenBalance < morisTokens ? sub.tokenBalance : morisTokens;
+
+        await tx.userSubscription.update({
             where: { userId },
             data: {
-                tokenBalance: { decrement: morisTokens },
-                tokensUsedThisPeriod: { increment: morisTokens },
+                tokenBalance: { decrement: actualDeduction },
+                tokensUsedThisPeriod: { increment: actualDeduction },
             },
-        }),
-        // Log usage
-        prisma.tokenUsage.create({
+        });
+
+        await tx.tokenUsage.create({
             data: {
                 userId,
                 projectId,
@@ -135,8 +145,8 @@ export async function deductTokens(params: {
                 morisTokensCharged: morisTokens,
                 multiplier,
             },
-        }),
-    ]);
+        });
+    });
 
     // Invalidate cached balance
     await invalidateCache(`tokens:${userId}`);
