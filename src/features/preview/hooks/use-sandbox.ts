@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useFiles } from "@/features/projects/hooks/use-files";
+import { useTerminalStore } from "@/features/terminal/store/terminal-store";
 import type { SandboxStatus, SandboxStreamEvent } from "@/types/sandbox";
 
 interface UseSandboxProps {
@@ -26,6 +27,9 @@ export const useSandbox = ({
     const [error, setError] = useState<string | null>(null);
     const [restartKey, setRestartKey] = useState(0);
     const [terminalOutput, setTerminalOutput] = useState("");
+    const [sandboxId, setSandboxIdLocal] = useState<string | null>(null);
+
+    const setSandboxId = useTerminalStore((s) => s.setSandboxId);
 
     const hasStartedRef = useRef(false);
     const abortRef = useRef<AbortController | null>(null);
@@ -114,6 +118,10 @@ export const useSandbox = ({
                                 case "url":
                                     setPreviewUrl(event.url);
                                     break;
+                                case "sandboxId":
+                                    setSandboxIdLocal(event.sandboxId);
+                                    setSandboxId(event.sandboxId);
+                                    break;
                                 case "error":
                                     setError(event.message);
                                     setStatus("error");
@@ -144,6 +152,7 @@ export const useSandbox = ({
         buildFilesRecord,
         settings?.devCommand,
         settings?.installCommand,
+        setSandboxId,
     ]);
 
     // Reset when disabled
@@ -153,9 +162,11 @@ export const useSandbox = ({
             setStatus("idle");
             setPreviewUrl(null);
             setError(null);
+            setSandboxIdLocal(null);
+            setSandboxId(null);
             abortRef.current?.abort();
         }
-    }, [enabled]);
+    }, [enabled, setSandboxId]);
 
     // Restart the sandbox process
     const restart = useCallback(() => {
@@ -165,8 +176,10 @@ export const useSandbox = ({
         setStatus("idle");
         setPreviewUrl(null);
         setError(null);
+        setSandboxIdLocal(null);
+        setSandboxId(null);
         setRestartKey((k) => k + 1);
-    }, []);
+    }, [setSandboxId]);
 
     return {
         status,
@@ -174,5 +187,6 @@ export const useSandbox = ({
         error,
         restart,
         terminalOutput,
+        sandboxId,
     };
 };

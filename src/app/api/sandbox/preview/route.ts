@@ -109,8 +109,10 @@ export async function POST(req: NextRequest): Promise<Response> {
                     // Not all projects expose a port — this is fine
                 }
 
-                // Cleanup
-                await sandbox.kill();
+                // NOTE: We intentionally do NOT kill the sandbox here.
+                // The sandbox stays alive so the interactive terminal can
+                // reconnect to it via Sandbox.connect(sandboxId) and access
+                // the project files in /code.
             } catch (error) {
                 const message =
                     error instanceof Error

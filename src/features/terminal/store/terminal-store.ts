@@ -17,6 +17,8 @@ interface TerminalState {
     terminals: Map<string, TerminalInstance>;
     activeTerminalId: string | null;
     nextId: number;
+    /** The sandbox ID of the currently running E2B sandbox */
+    sandboxId: string | null;
 
     addTerminal: () => string;
     removeTerminal: (id: string) => void;
@@ -26,12 +28,14 @@ interface TerminalState {
     setLastResult: (id: string, result: SandboxExecResult | null) => void;
     renameTerminal: (id: string, title: string) => void;
     clearOutput: (id: string) => void;
+    setSandboxId: (sandboxId: string | null) => void;
 }
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
     terminals: new Map(),
     activeTerminalId: null,
     nextId: 1,
+    sandboxId: null,
 
     addTerminal: () => {
         const { nextId, terminals } = get();
@@ -127,5 +131,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         const newTerminals = new Map(terminals);
         newTerminals.set(id, { ...terminal, output: "", lastResult: null });
         set({ terminals: newTerminals });
+    },
+
+    setSandboxId: (sandboxId) => {
+        set({ sandboxId });
     },
 }));

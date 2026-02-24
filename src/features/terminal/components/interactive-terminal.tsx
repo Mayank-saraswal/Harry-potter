@@ -27,6 +27,7 @@ export const InteractiveTerminal = ({
     const appendOutput = useTerminalStore((s) => s.appendOutput);
     const setRunning = useTerminalStore((s) => s.setRunning);
     const setLastResult = useTerminalStore((s) => s.setLastResult);
+    const sandboxId = useTerminalStore((s) => s.sandboxId);
 
     // Execute a command via the E2B sandbox API
     const handleCommand = useCallback(
@@ -41,7 +42,10 @@ export const InteractiveTerminal = ({
             setRunning(terminalId, true);
 
             try {
-                const result = await executeCommand(command.trim());
+                const result = await executeCommand(
+                    command.trim(),
+                    sandboxId ?? undefined
+                );
 
                 if (result.stdout) {
                     terminal.write(result.stdout.replace(/\n/g, "\r\n"));
@@ -76,7 +80,7 @@ export const InteractiveTerminal = ({
                 terminal.write("\r\n$ ");
             }
         },
-        [terminalId, appendOutput, setRunning, setLastResult, onProcessExit]
+        [terminalId, appendOutput, setRunning, setLastResult, onProcessExit, sandboxId]
     );
 
     // Initialize xterm

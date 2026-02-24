@@ -27,7 +27,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         );
     }
 
-    const { command } = body;
+    const { command, sandboxId } = body;
     if (!command || typeof command !== "string") {
         return NextResponse.json(
             { error: "Missing or invalid 'command' field" },
@@ -35,8 +35,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         );
     }
 
+    if (sandboxId !== undefined && typeof sandboxId !== "string") {
+        return NextResponse.json(
+            { error: "Invalid 'sandboxId' field" },
+            { status: 400 }
+        );
+    }
+
     try {
-        const result: SandboxExecResult = await runInSandbox(command);
+        const result: SandboxExecResult = await runInSandbox(
+            command,
+            undefined,
+            sandboxId
+        );
         return NextResponse.json(result);
     } catch (error) {
         const message =

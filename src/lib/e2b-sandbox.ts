@@ -30,17 +30,43 @@ export async function createSandbox(
 
 /**
  * Run a single command in an E2B sandbox and return output.
- * If no sandbox is provided, a new one is created and killed after execution.
+ *
+ * When a `sandboxId` is provided the function reconnects to the existing
+ * sandbox via `Sandbox.connect()` so that project files in `/code` are
+ * still available.  Commands always execute with `cwd: "/code"` so they
+ * run in the correct project directory.
+ *
+ * If neither `sandboxId` nor an existing `Sandbox` instance is supplied,
+ * a brand-new sandbox is created and killed after execution (legacy
+ * behaviour kept for backward-compatibility).
  */
 export async function runInSandbox(
     command: string,
-    sandbox?: Sandbox
+    sandbox?: Sandbox,
+    sandboxId?: string
 ): Promise<SandboxExecResult> {
-    const ownSandbox = !sandbox;
-    const sb = sandbox ?? (await createSandbox());
+    requireApiKey();
+
+    let sb: Sandbox;
+    let ownSandbox = false;
+
+    if (sandbox) {
+        sb = sandbox;
+    } else if (sandboxId) {
+        try {
+            sb = await Sandbox.connect(sandboxId);
+        } catch {
+            // Sandbox may have timed out or been killed — fall back to a new one
+            sb = await createSandbox();
+            ownSandbox = true;
+        }
+    } else {
+        sb = await createSandbox();
+        ownSandbox = true;
+    }
 
     try {
-        const result = await sb.commands.run(command);
+        const result = await sb.commands.run(command, { cwd: "/code" });
         return {
             stdout: result.stdout,
             stderr: result.stderr,
