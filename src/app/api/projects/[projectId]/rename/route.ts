@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
 type Params = { params: Promise<{ projectId: string }> };
+
+const renameSchema = z.object({
+    name: z.string().min(1).max(100),
+});
 
 /**
  * POST /api/projects/[projectId]/rename — Rename a project
@@ -14,7 +19,13 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const { projectId } = await params;
-    const { name } = await request.json();
+    const body = await request.json();
+    const parsed = renameSchema.safeParse(body);
+    if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const { name } = parsed.data;
 
     const project = await prisma.project.updateMany({
         where: { id: projectId, userId },

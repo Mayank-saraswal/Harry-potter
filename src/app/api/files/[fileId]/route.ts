@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { readTextFile, uploadTextFile, deleteFile as deleteFileBlob } from "@/lib/file-storage";
+import { z } from "zod";
 
 type Params = { params: Promise<{ fileId: string }> };
+
+const updateFileSchema = z.object({
+    content: z.string(),
+});
 
 /**
  * GET /api/files/[fileId] — Get file metadata
@@ -38,7 +43,13 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const { fileId } = await params;
-    const { content } = await request.json();
+    const body = await request.json();
+    const parsed = updateFileSchema.safeParse(body);
+    if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const { content } = parsed.data;
 
     const file = await prisma.file.findUnique({
         where: { id: fileId },

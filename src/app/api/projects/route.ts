@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
 /**
  * GET /api/projects — List all projects for the current user
@@ -13,16 +14,30 @@ export async function GET(request: Request) {
     }
 
     const url = new URL(request.url);
-    const limit = url.searchParams.get("limit");
+    const limitParam = url.searchParams.get("limit");
+    let take: number | undefined;
+    if (limitParam) {
+        const parsed = parseInt(limitParam, 10);
+        if (isNaN(parsed) || parsed < 1 || parsed > 100) {
+            return NextResponse.json({ error: "Invalid limit parameter" }, { status: 400 });
+        }
+        take = parsed;
+    }
 
     const projects = await prisma.project.findMany({
         where: { userId },
         orderBy: { updatedAt: "desc" },
-        ...(limit ? { take: parseInt(limit) } : {}),
+        ...(take ? { take } : {}),
     });
 
     return NextResponse.json(projects);
 }
+
+const createProjectSchema = z.object({
+    name: z.string().min(1).max(100).optional(),
+    language: z.string().min(1).max(50).optional(),
+    framework: z.string().max(50).optional(),
+});
 
 /**
  * POST /api/projects — Create a new project
@@ -33,7 +48,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, language, framework } = await request.json();
+    const body = await request.json();
+    const parsed = createProjectSchema.safeParse(body);
+    if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const { name, language, framework } = parsed.data;
 
     const project = await prisma.project.create({
         data: {
