@@ -153,14 +153,14 @@ export function getLanguageConfig(files: Record<string, string>): {
         };
     }
 
-    if (filenames.some((f) => f.endsWith(".cpp") || f.endsWith(".c"))) {
-        const mainFile =
-            filenames.find((f) => f.endsWith(".cpp") || f.endsWith(".c")) ??
-            "main.cpp";
-        const compiler = mainFile.endsWith(".c") ? "gcc" : "g++";
+    const cFile = filenames.find(
+        (f) => f.endsWith(".cpp") || f.endsWith(".c")
+    );
+    if (cFile) {
+        const compiler = cFile.endsWith(".c") ? "gcc" : "g++";
         return {
-            language: mainFile.endsWith(".c") ? "c" : "cpp",
-            runCommand: `${compiler} -o main ${mainFile} && ./main`,
+            language: cFile.endsWith(".c") ? "c" : "cpp",
+            runCommand: `${compiler} -o main ${cFile} && ./main`,
         };
     }
 
