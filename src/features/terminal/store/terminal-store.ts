@@ -1,11 +1,16 @@
-import { WebContainerProcess } from "@webcontainer/api";
 import { create } from "zustand";
+
+import type { SandboxExecResult } from "@/types/sandbox";
 
 export interface TerminalInstance {
     id: string;
     title: string;
-    process: WebContainerProcess | null;
+    /** Whether the terminal is awaiting or processing a command */
     isRunning: boolean;
+    /** Accumulated output for display */
+    output: string;
+    /** Latest execution result (null while running) */
+    lastResult: SandboxExecResult | null;
 }
 
 interface TerminalState {
@@ -13,12 +18,14 @@ interface TerminalState {
     activeTerminalId: string | null;
     nextId: number;
 
-    addTerminal: (process?: WebContainerProcess) => string;
+    addTerminal: () => string;
     removeTerminal: (id: string) => void;
     setActiveTerminal: (id: string) => void;
-    setProcess: (id: string, process: WebContainerProcess) => void;
     setRunning: (id: string, isRunning: boolean) => void;
+    appendOutput: (id: string, data: string) => void;
+    setLastResult: (id: string, result: SandboxExecResult | null) => void;
     renameTerminal: (id: string, title: string) => void;
+    clearOutput: (id: string) => void;
 }
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
@@ -26,15 +33,16 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     activeTerminalId: null,
     nextId: 1,
 
-    addTerminal: (process) => {
+    addTerminal: () => {
         const { nextId, terminals } = get();
         const id = `terminal-${nextId}`;
         const title = `Terminal ${nextId}`;
         const instance: TerminalInstance = {
             id,
             title,
-            process: process ?? null,
-            isRunning: true,
+            isRunning: false,
+            output: "",
+            lastResult: null,
         };
 
         const newTerminals = new Map(terminals);
@@ -51,13 +59,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
     removeTerminal: (id) => {
         const { terminals, activeTerminalId } = get();
-        const terminal = terminals.get(id);
-
-        // Kill the process if still running
-        if (terminal?.process) {
-            terminal.process.kill();
-        }
-
         const newTerminals = new Map(terminals);
         newTerminals.delete(id);
 
@@ -75,16 +76,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         set({ activeTerminalId: id });
     },
 
-    setProcess: (id, process) => {
-        const { terminals } = get();
-        const terminal = terminals.get(id);
-        if (!terminal) return;
-
-        const newTerminals = new Map(terminals);
-        newTerminals.set(id, { ...terminal, process });
-        set({ terminals: newTerminals });
-    },
-
     setRunning: (id, isRunning) => {
         const { terminals } = get();
         const terminal = terminals.get(id);
@@ -95,6 +86,29 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         set({ terminals: newTerminals });
     },
 
+    appendOutput: (id, data) => {
+        const { terminals } = get();
+        const terminal = terminals.get(id);
+        if (!terminal) return;
+
+        const newTerminals = new Map(terminals);
+        newTerminals.set(id, {
+            ...terminal,
+            output: terminal.output + data,
+        });
+        set({ terminals: newTerminals });
+    },
+
+    setLastResult: (id, result) => {
+        const { terminals } = get();
+        const terminal = terminals.get(id);
+        if (!terminal) return;
+
+        const newTerminals = new Map(terminals);
+        newTerminals.set(id, { ...terminal, lastResult: result });
+        set({ terminals: newTerminals });
+    },
+
     renameTerminal: (id, title) => {
         const { terminals } = get();
         const terminal = terminals.get(id);
@@ -102,6 +116,16 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
         const newTerminals = new Map(terminals);
         newTerminals.set(id, { ...terminal, title });
+        set({ terminals: newTerminals });
+    },
+
+    clearOutput: (id) => {
+        const { terminals } = get();
+        const terminal = terminals.get(id);
+        if (!terminal) return;
+
+        const newTerminals = new Map(terminals);
+        newTerminals.set(id, { ...terminal, output: "", lastResult: null });
         set({ terminals: newTerminals });
     },
 }));

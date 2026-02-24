@@ -1,5 +1,3 @@
-import { FileSystemTree } from "@webcontainer/api";
-
 interface FileRecord {
     id: string;
     name: string;
@@ -9,56 +7,29 @@ interface FileRecord {
 }
 
 /**
- * Convert flat file records to nested FileSystemTree for WebContainer.
- * Uses path-based file structure (e.g. "src/components/Button.tsx").
- * Note: Only text files with loaded content are included in the tree.
+ * Convert flat file records to a nested Record<string, string> suitable
+ * for writing into an E2B sandbox (path → content).
+ *
+ * Only text files are included. Binary files (those backed by blob storage)
+ * are skipped because they are fetched on demand.
  */
-export const buildFileTree = (
+export const buildFilesRecord = (
     files: FileRecord[],
     fileContents?: Map<string, string>
-): FileSystemTree => {
-    const tree: FileSystemTree = {};
+): Record<string, string> => {
+    const record: Record<string, string> = {};
 
-    // Sort so folders come first, then files
-    const sorted = [...files].sort((a, b) => {
-        if (a.type === "folder" && b.type !== "folder") return -1;
-        if (a.type !== "folder" && b.type === "folder") return 1;
-        return a.path.localeCompare(b.path);
-    });
+    for (const file of files) {
+        if (file.type !== "file") continue;
 
-    for (const file of sorted) {
-        const pathParts = file.path.split("/");
-        let current = tree;
-
-        for (let i = 0; i < pathParts.length; i++) {
-            const part = pathParts[i];
-            const isLast = i === pathParts.length - 1;
-
-            if (isLast) {
-                if (file.type === "folder") {
-                    if (!current[part]) {
-                        current[part] = { directory: {} };
-                    }
-                } else {
-                    // Get content from the contents map if available
-                    const content = fileContents?.get(file.id) ?? "";
-                    if (content || !file.blobPath) {
-                        current[part] = { file: { contents: content } };
-                    }
-                }
-            } else {
-                if (!current[part]) {
-                    current[part] = { directory: {} };
-                }
-                const node = current[part];
-                if ("directory" in node) {
-                    current = node.directory;
-                }
-            }
+        const content = fileContents?.get(file.id) ?? "";
+        // Only include files that have content or are not backed by blob storage
+        if (content || !file.blobPath) {
+            record[file.path] = content;
         }
     }
 
-    return tree;
+    return record;
 };
 
 /**
