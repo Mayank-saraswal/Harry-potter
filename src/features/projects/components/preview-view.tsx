@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { ImportGithubDialog } from "./import-github-dialog";
 
-import { useWebContainer } from "@/features/preview/hooks/use-webcontainer";
+import { useSandbox } from "@/features/preview/hooks/use-sandbox";
 import { PreviewSettingsPopover } from "@/features/preview/components/preview-settings-popover";
 import { PreviewTerminal } from "@/features/preview/components/preview-terminal";
 
@@ -26,13 +26,13 @@ export const PreviewView = ({ projectId }: { projectId: string }) => {
 
   const {
     status, previewUrl, error, restart, terminalOutput
-  } = useWebContainer({
+  } = useSandbox({
     projectId,
     enabled: true,
     settings: project?.settings as { installCommand?: string; devCommand?: string } | undefined,
   });
 
-  const isLoading = status === "booting" || status === "installing";
+  const isLoading = status === "creating" || status === "installing";
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -43,7 +43,7 @@ export const PreviewView = ({ projectId }: { projectId: string }) => {
           className="h-full rounded-none"
           disabled={isLoading}
           onClick={restart}
-          title="Restart container"
+          title="Restart sandbox"
         >
           <RefreshCwIcon className="size-3" />
         </Button>
@@ -52,7 +52,7 @@ export const PreviewView = ({ projectId }: { projectId: string }) => {
           {isLoading && (
             <div className="flex items-center gap-1.5">
               <Loader2Icon className="size-3 animate-spin" />
-              {status === "booting" ? "Starting..." : "Installing..."}
+              {status === "creating" ? "Creating sandbox..." : "Installing..."}
             </div>
           )}
           {previewUrl && <span className="truncate">{previewUrl}</span>}
@@ -95,7 +95,11 @@ export const PreviewView = ({ projectId }: { projectId: string }) => {
               <div className="size-full flex items-center justify-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-2 max-w-md mx-auto text-center">
                   <Loader2Icon className="size-6 animate-spin" />
-                  <p className="text-sm font-medium">Installing...</p>
+                  <p className="text-sm font-medium">
+                    {status === "creating"
+                      ? "Creating sandbox..."
+                      : "Installing dependencies..."}
+                  </p>
                 </div>
               </div>
             )}
@@ -105,6 +109,7 @@ export const PreviewView = ({ projectId }: { projectId: string }) => {
                 src={previewUrl}
                 className="size-full border-0"
                 title="Preview"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
               />
             )}
           </Allotment.Pane>

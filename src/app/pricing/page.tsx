@@ -18,7 +18,7 @@ const PLANS = [
             "500K Moris tokens/month",
             "AI coding assistant",
             "File management",
-            "WebContainer preview",
+            "E2B sandbox preview",
             "Community support",
         ],
         cta: "Current Plan",

@@ -7,7 +7,7 @@
 ## 🚀 Features
 
 - **🤖 AI Coding Assistant**: Powered by advanced LLMs (Claude 3.5 Sonnet, GPT-4o, DeepSeek R1, etc.) to understand your intent and write code.
-- **⚡ WebContainer Execution**: Run Node.js full-stack applications directly in your browser with zero server overhead.
+- **⚡ E2B Sandbox Execution**: Run full-stack applications in any programming language securely via E2B cloud sandboxes.
 - **🧠 Real-time Thinking**: Visualize the AI's reasoning process and tool usage in real-time as it works on your tasks.
 - **🖥️ Integrated Terminal**: Full-featured xterm.js terminal for running commands, installing packages, and managing your app.
 - **📂 File Management**: Create, edit, rename, and delete files with a VS Code-like file explorer.
@@ -21,7 +21,7 @@
 - **Styling**: Tailwind CSS v4, Shadcn UI, Radix UI, Lucide Icons
 - **State Management**: Convex (Real-time DB), Zustand
 - **AI & Agents**: Vercel AI SDK, Inngest (Agentic Workflows), OpenRouter
-- **Execution Environment**: WebContainers API
+- **Execution Environment**: E2B Sandbox
 - **Editor**: CodeMirror 6 with language support
 - **Auth**: Clerk
 

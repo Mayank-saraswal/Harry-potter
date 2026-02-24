@@ -5,7 +5,6 @@ import { PlusIcon, XIcon, TerminalSquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTerminalStore } from "../store/terminal-store";
 import { TerminalTab } from "./terminal-tab";
-import { spawnShell } from "../utils/spawn-shell";
 
 export const TerminalPanel = () => {
     const terminals = useTerminalStore((s) => s.terminals);
@@ -13,27 +12,20 @@ export const TerminalPanel = () => {
     const addTerminal = useTerminalStore((s) => s.addTerminal);
     const removeTerminal = useTerminalStore((s) => s.removeTerminal);
     const setActiveTerminal = useTerminalStore((s) => s.setActiveTerminal);
-    const setProcess = useTerminalStore((s) => s.setProcess);
     const setRunning = useTerminalStore((s) => s.setRunning);
 
     const hasInitialized = useRef(false);
 
-    // Spawn default terminal on first mount
+    // Create a default terminal on first mount
     useEffect(() => {
         if (hasInitialized.current || terminals.size > 0) return;
         hasInitialized.current = true;
-        handleNewTerminal();
+        addTerminal();
     }, []);
 
-    const handleNewTerminal = useCallback(async () => {
-        const id = addTerminal();
-        try {
-            const process = await spawnShell();
-            setProcess(id, process);
-        } catch (error) {
-            console.error("Failed to spawn shell:", error);
-        }
-    }, [addTerminal, setProcess]);
+    const handleNewTerminal = useCallback(() => {
+        addTerminal();
+    }, [addTerminal]);
 
     const handleCloseTerminal = useCallback(
         (e: React.MouseEvent, id: string) => {
@@ -51,9 +43,6 @@ export const TerminalPanel = () => {
     );
 
     const terminalEntries = Array.from(terminals.entries());
-    const activeTerminal = activeTerminalId
-        ? terminals.get(activeTerminalId)
-        : null;
 
     return (
         <div className="h-full flex flex-col bg-background border-t">
@@ -75,8 +64,8 @@ export const TerminalPanel = () => {
                         <span className="truncate max-w-[100px]">
                             {terminal.title}
                         </span>
-                        {!terminal.isRunning && (
-                            <span className="size-1.5 rounded-full bg-zinc-500 shrink-0" />
+                        {terminal.isRunning && (
+                            <span className="size-1.5 rounded-full bg-green-500 shrink-0 animate-pulse" />
                         )}
                         <span
                             onClick={(e) => handleCloseTerminal(e, id)}
@@ -99,7 +88,7 @@ export const TerminalPanel = () => {
 
             {/* Terminal content */}
             <div className="flex-1 min-h-0 relative">
-                {terminalEntries.map(([id, terminal]) => (
+                {terminalEntries.map(([id]) => (
                     <div
                         key={id}
                         className={cn(
@@ -109,7 +98,6 @@ export const TerminalPanel = () => {
                     >
                         <TerminalTab
                             id={id}
-                            process={terminal.process}
                             onExit={handleProcessExit}
                         />
                     </div>

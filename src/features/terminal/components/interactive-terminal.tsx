@@ -1,23 +1,83 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import type { WebContainerProcess } from "@webcontainer/api";
+
+import { executeCommand } from "@/features/terminal/utils/spawn-shell";
+import { useTerminalStore } from "@/features/terminal/store/terminal-store";
 
 import "@xterm/xterm/css/xterm.css";
 
 interface InteractiveTerminalProps {
-    process: WebContainerProcess | null;
+    terminalId: string;
     onProcessExit?: (exitCode: number) => void;
 }
 
-export const InteractiveTerminal = ({ process, onProcessExit }: InteractiveTerminalProps) => {
+export const InteractiveTerminal = ({
+    terminalId,
+    onProcessExit,
+}: InteractiveTerminalProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const terminalRef = useRef<Terminal | null>(null);
     const fitAddonRef = useRef<FitAddon | null>(null);
-    const writerRef = useRef<WritableStreamDefaultWriter<string> | null>(null);
-    const outputReaderRef = useRef<ReadableStreamDefaultReader<string> | null>(null);
+    const inputBufferRef = useRef("");
+    const isExecutingRef = useRef(false);
+
+    const appendOutput = useTerminalStore((s) => s.appendOutput);
+    const setRunning = useTerminalStore((s) => s.setRunning);
+    const setLastResult = useTerminalStore((s) => s.setLastResult);
+
+    // Execute a command via the E2B sandbox API
+    const handleCommand = useCallback(
+        async (command: string) => {
+            const terminal = terminalRef.current;
+            if (!terminal || !command.trim()) {
+                terminal?.write("\r\n$ ");
+                return;
+            }
+
+            isExecutingRef.current = true;
+            setRunning(terminalId, true);
+
+            try {
+                const result = await executeCommand(command.trim());
+
+                if (result.stdout) {
+                    terminal.write(result.stdout.replace(/\n/g, "\r\n"));
+                }
+                if (result.stderr) {
+                    terminal.write(
+                        `\x1b[31m${result.stderr.replace(/\n/g, "\r\n")}\x1b[0m`
+                    );
+                }
+
+                setLastResult(terminalId, result);
+                appendOutput(
+                    terminalId,
+                    `$ ${command}\n${result.stdout}${result.stderr}`
+                );
+
+                if (result.exitCode !== 0) {
+                    terminal.write(
+                        `\r\n\x1b[90m[exit code ${result.exitCode}]\x1b[0m`
+                    );
+                    onProcessExit?.(result.exitCode);
+                }
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : "Command execution failed";
+                terminal.write(`\r\n\x1b[31mError: ${message}\x1b[0m`);
+            } finally {
+                isExecutingRef.current = false;
+                setRunning(terminalId, false);
+                terminal.write("\r\n$ ");
+            }
+        },
+        [terminalId, appendOutput, setRunning, setLastResult, onProcessExit]
+    );
 
     // Initialize xterm
     useEffect(() => {
@@ -27,7 +87,8 @@ export const InteractiveTerminal = ({ process, onProcessExit }: InteractiveTermi
             convertEol: true,
             disableStdin: false,
             fontSize: 13,
-            fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+            fontFamily:
+                "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
             theme: {
                 background: "#0a0a0f",
                 foreground: "#d4d4d8",
@@ -64,6 +125,36 @@ export const InteractiveTerminal = ({ process, onProcessExit }: InteractiveTermi
         terminalRef.current = terminal;
         fitAddonRef.current = fitAddon;
 
+        // Show initial prompt
+        terminal.write("E2B Sandbox Terminal\r\n$ ");
+
+        // Handle user input
+        terminal.onData((data) => {
+            if (isExecutingRef.current) return;
+
+            if (data === "\r") {
+                // Enter pressed — execute the buffered command
+                terminal.write("\r\n");
+                const cmd = inputBufferRef.current;
+                inputBufferRef.current = "";
+                handleCommand(cmd);
+            } else if (data === "\x7f") {
+                // Backspace
+                if (inputBufferRef.current.length > 0) {
+                    inputBufferRef.current = inputBufferRef.current.slice(0, -1);
+                    terminal.write("\b \b");
+                }
+            } else if (data === "\x03") {
+                // Ctrl+C
+                inputBufferRef.current = "";
+                terminal.write("^C\r\n$ ");
+            } else if (data >= " ") {
+                // Printable characters
+                inputBufferRef.current += data;
+                terminal.write(data);
+            }
+        });
+
         requestAnimationFrame(() => fitAddon.fit());
 
         const resizeObserver = new ResizeObserver(() => {
@@ -77,56 +168,7 @@ export const InteractiveTerminal = ({ process, onProcessExit }: InteractiveTermi
             terminalRef.current = null;
             fitAddonRef.current = null;
         };
-    }, []);
-
-    // Connect xterm to the WebContainer process
-    useEffect(() => {
-        const terminal = terminalRef.current;
-        if (!terminal || !process) return;
-
-        // Write user input to the process stdin
-        const writer = process.input.getWriter();
-        writerRef.current = writer;
-
-        const onDataDisposable = terminal.onData((data) => {
-            writer.write(data);
-        });
-
-        // Pipe process output to xterm
-        const reader = process.output.getReader();
-        outputReaderRef.current = reader;
-
-        let cancelled = false;
-        const readOutput = async () => {
-            try {
-                while (!cancelled) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    if (value) terminal.write(value);
-                }
-            } catch {
-                // Stream closed or cancelled — expected on cleanup
-            }
-        };
-        readOutput();
-
-        // Listen for process exit
-        process.exit.then((exitCode) => {
-            if (!cancelled) {
-                terminal.write(`\r\n\x1b[90m[Process exited with code ${exitCode}]\x1b[0m\r\n`);
-                onProcessExit?.(exitCode);
-            }
-        });
-
-        return () => {
-            cancelled = true;
-            onDataDisposable.dispose();
-            reader.releaseLock();
-            writer.releaseLock();
-            writerRef.current = null;
-            outputReaderRef.current = null;
-        };
-    }, [process, onProcessExit]);
+    }, [handleCommand]);
 
     return (
         <div

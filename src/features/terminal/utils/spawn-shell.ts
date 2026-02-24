@@ -1,14 +1,25 @@
-import { getWebContainer } from "@/lib/webcontainer";
-import type { WebContainerProcess } from "@webcontainer/api";
+import type { SandboxExecResult } from "@/types/sandbox";
 
 /**
- * Spawn an interactive shell session inside the WebContainer.
- * Returns the process which exposes `output` (ReadableStream) and `input` (WritableStream).
+ * Execute a command in a server-side E2B sandbox via the API route.
+ * Returns the execution result (stdout, stderr, exitCode).
  */
-export const spawnShell = async (): Promise<WebContainerProcess> => {
-    const container = await getWebContainer();
-    const process = await container.spawn("jsh", {
-        terminal: { cols: 80, rows: 24 },
+export const executeCommand = async (
+    command: string
+): Promise<SandboxExecResult> => {
+    const response = await fetch("/api/sandbox/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command }),
     });
-    return process;
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(
+            (data as { error?: string } | null)?.error ??
+                `Server error (${response.status})`
+        );
+    }
+
+    return response.json() as Promise<SandboxExecResult>;
 };
