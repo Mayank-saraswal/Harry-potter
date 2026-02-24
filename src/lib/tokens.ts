@@ -130,7 +130,7 @@ export async function deductTokens(params: {
             where: { userId },
             data: {
                 tokenBalance: { decrement: actualDeduction },
-                tokensUsedThisPeriod: { increment: morisTokens },
+                tokensUsedThisPeriod: { increment: actualDeduction },
             },
         });
 

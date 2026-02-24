@@ -53,10 +53,10 @@ export async function GET(request: Request, { params }: Params) {
             orderBy: [{ type: "asc" }, { name: "asc" }],
         });
 
-        // Filter to direct children only
+        // Filter to direct children only (query results already start with parentPath/)
         files = files.filter((f: { path: string }) => {
             const relativePath = f.path.slice(parentPath.length + 1);
-            return !relativePath.includes("/");
+            return relativePath.length > 0 && !relativePath.includes("/");
         });
     } else {
         // Get all files (flat list)
