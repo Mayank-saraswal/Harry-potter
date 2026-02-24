@@ -35,6 +35,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         );
     }
 
+    if (sandboxId !== undefined && typeof sandboxId !== "string") {
+        return NextResponse.json(
+            { error: "Invalid 'sandboxId' field" },
+            { status: 400 }
+        );
+    }
+
     try {
         const result: SandboxExecResult = await runInSandbox(
             command,

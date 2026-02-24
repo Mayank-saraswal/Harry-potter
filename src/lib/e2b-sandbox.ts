@@ -53,7 +53,13 @@ export async function runInSandbox(
     if (sandbox) {
         sb = sandbox;
     } else if (sandboxId) {
-        sb = await Sandbox.connect(sandboxId);
+        try {
+            sb = await Sandbox.connect(sandboxId);
+        } catch {
+            // Sandbox may have timed out or been killed — fall back to a new one
+            sb = await createSandbox();
+            ownSandbox = true;
+        }
     } else {
         sb = await createSandbox();
         ownSandbox = true;
