@@ -1,10 +1,10 @@
 "use client";
 
-import { ProjectView } from "@/features/projects/components/project-view";
+import LandingPage from "@/features/landing/components/landing-page";
 
 const Home = () => {
   return (
-    <ProjectView />
+    <LandingPage />
   );
 };
 
