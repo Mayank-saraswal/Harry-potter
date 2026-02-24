@@ -59,11 +59,14 @@ export async function GET(request: Request, { params }: Params) {
             return relativePath.length > 0 && !relativePath.includes("/");
         });
     } else {
-        // Get all files (flat list)
-        files = await prisma.file.findMany({
+        // Get all files
+        const allFiles = await prisma.file.findMany({
             where: { projectId },
             orderBy: [{ type: "asc" }, { name: "asc" }],
         });
+
+        // Filter to only root-level items (no slashes in path)
+        files = allFiles.filter((f: { path: string }) => !f.path.includes("/"));
     }
 
     return NextResponse.json(files);

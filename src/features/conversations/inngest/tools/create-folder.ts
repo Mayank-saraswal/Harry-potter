@@ -37,14 +37,21 @@ export const createCreateFolderTool = ({
         return await toolStep?.run("create-folder", async () => {
           const folderPath = parentPath ? `${parentPath}/${name}` : name;
 
-          const folder = await prisma.file.create({
-            data: {
-              projectId,
-              name,
-              path: folderPath,
-              type: "folder",
-            },
+          // Check for existing folder
+          let folder = await prisma.file.findFirst({
+            where: { projectId, path: folderPath, type: "folder" }
           });
+
+          if (!folder) {
+            folder = await prisma.file.create({
+              data: {
+                projectId,
+                name,
+                path: folderPath,
+                type: "folder",
+              },
+            });
+          }
 
           return `Folder "${name}" created at path: ${folderPath} (ID: ${folder.id})`;
         });

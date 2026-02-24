@@ -68,10 +68,22 @@ export const importGithubRepo = inngest.createFunction(
                 return aDepth - bDepth;
             });
 
+        // Deduplicate folders in case the tree contains duplicates
+        const uniqueFolderPaths = new Set<string>();
+        const uniqueFolders = folders.filter((folder) => {
+            if (!folder.path || uniqueFolderPaths.has(folder.path)) return false;
+            uniqueFolderPaths.add(folder.path);
+            return true;
+        });
+
         // Create folder records in Prisma
         await step.run("create-folders", async () => {
-            for (const folder of folders) {
-                if (!folder.path) continue;
+            for (const folder of uniqueFolders) {
+                // Check if it already exists to be safe
+                const existing = await prisma.file.findFirst({
+                    where: { projectId, path: folder.path, type: "folder" }
+                });
+                if (existing) continue;
 
                 const name = folder.path.split("/").pop()!;
 
