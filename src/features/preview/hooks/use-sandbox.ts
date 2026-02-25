@@ -83,7 +83,7 @@ export const useSandbox = ({
                     const data = await response.json().catch(() => null);
                     throw new Error(
                         (data as { error?: string } | null)?.error ??
-                            `Server error (${response.status})`
+                        `Server error (${response.status})`
                     );
                 }
 
