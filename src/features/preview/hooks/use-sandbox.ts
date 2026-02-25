@@ -34,20 +34,8 @@ export const useSandbox = ({
     const hasStartedRef = useRef(false);
     const abortRef = useRef<AbortController | null>(null);
 
-    // Fetch files from database (auto-updates on changes via React Query)
+    // Fetch files from database (used to guard against starting for empty projects)
     const { data: files } = useFiles(projectId);
-
-    // Build a flat Record<path, content> from file records
-    const buildFilesRecord = useCallback((): Record<string, string> => {
-        if (!files) return {};
-        const record: Record<string, string> = {};
-        for (const file of files) {
-            if (file.type === "file") {
-                record[file.path] = "";
-            }
-        }
-        return record;
-    }, [files]);
 
     // Initial boot and mount
     useEffect(() => {
@@ -66,13 +54,11 @@ export const useSandbox = ({
                 setError(null);
                 setTerminalOutput("");
 
-                const filesRecord = buildFilesRecord();
-
                 const response = await fetch("/api/sandbox/preview", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        files: filesRecord,
+                        projectId,
                         installCommand: settings?.installCommand,
                         devCommand: settings?.devCommand,
                     }),
@@ -149,7 +135,7 @@ export const useSandbox = ({
         enabled,
         files,
         restartKey,
-        buildFilesRecord,
+        projectId,
         settings?.devCommand,
         settings?.installCommand,
         setSandboxId,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { Sandbox } from "e2b";
 
 import { runInSandbox } from "@/lib/e2b-sandbox";
 import type { SandboxExecRequest, SandboxExecResult } from "@/types/sandbox";
@@ -8,7 +9,7 @@ import type { SandboxExecRequest, SandboxExecResult } from "@/types/sandbox";
  * POST /api/sandbox/execute
  *
  * Run a command inside an E2B sandbox.
- * Body: { command: string }
+ * Body: { command: string; sandboxId?: string }
  * Returns: SandboxExecResult
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         );
     }
 
-    if (sandboxId !== undefined && typeof sandboxId !== "string") {
+    if (sandboxId !== undefined && sandboxId !== null && typeof sandboxId !== "string") {
         return NextResponse.json(
             { error: "Invalid 'sandboxId' field" },
             { status: 400 }
@@ -43,11 +44,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     try {
-        const result: SandboxExecResult = await runInSandbox(
-            command,
-            undefined,
-            sandboxId
-        );
+        let sb: Sandbox | undefined;
+        if (sandboxId) {
+            try {
+                sb = await Sandbox.connect(sandboxId);
+            } catch {
+                // Sandbox may have timed out — fall through to runInSandbox default
+            }
+        }
+
+        // Wrap the command to run in /code when reconnecting to an existing sandbox
+        const cmdToRun =
+            sandboxId && !command.startsWith("cd ")
+                ? `cd /code && ${command}`
+                : command;
+
+        const result: SandboxExecResult = await runInSandbox(cmdToRun, sb);
         return NextResponse.json(result);
     } catch (error) {
         const message =

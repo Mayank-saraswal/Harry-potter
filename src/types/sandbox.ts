@@ -20,7 +20,7 @@ export interface SandboxExecResult {
 
 /** Payload sent to the preview API to start a sandbox preview */
 export interface SandboxPreviewRequest {
-    files: Record<string, string>;
+    projectId: string;
     installCommand?: string;
     devCommand?: string;
 }
@@ -33,7 +33,7 @@ export interface SandboxPreviewResponse {
 
 /** Payload sent to the execute API to run a command */
 export interface SandboxExecRequest {
-    sandboxId?: string;
+    sandboxId?: string | null;
     command: string;
 }
 
