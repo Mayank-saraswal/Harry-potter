@@ -13,17 +13,22 @@
 - **📂 File Management**: Create, edit, rename, and delete files with a VS Code-like file explorer.
 - **👀 Live Preview**: Instant preview of your web application as you build it.
 - **🐙 GitHub Integration**: Export your generated projects directly to GitHub with a single click.
+- **💳 Billing**: Built-in subscription and payment support via Razorpay.
 - **🎨 Beautiful UI**: Modern, responsive interface built with Tailwind CSS v4 and Framer Motion.
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript
 - **Styling**: Tailwind CSS v4, Shadcn UI, Radix UI, Lucide Icons
-- **State Management**: Convex (Real-time DB), Zustand
+- **Database**: Supabase (PostgreSQL + Realtime), Prisma ORM
+- **State Management**: Zustand
 - **AI & Agents**: Vercel AI SDK, Inngest (Agentic Workflows), OpenRouter
 - **Execution Environment**: E2B Sandbox
+- **File Storage**: Azure Blob Storage
+- **Caching**: Upstash Redis
 - **Editor**: CodeMirror 6 with language support
 - **Auth**: Clerk
+- **Payments**: Razorpay
 
 ## ⚡ Getting Started
 
@@ -49,38 +54,65 @@
     Create a `.env.local` file in the root directory and add the following keys:
 
     ```env
-    # Convex
-    CONVEX_DEPLOYMENT=
-    NEXT_PUBLIC_CONVEX_URL=
-    MORIS_CONVEX_INTERNAL_KEY=your_secret_key
-
     # Clerk Auth
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
     CLERK_SECRET_KEY=
+    CLERK_JWT_ISSUER_DOMAIN=
+
+    # Supabase (Database + Realtime)
+    NEXT_PUBLIC_SUPABASE_URL=
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=
+    DATABASE_URL=
+    DIRECT_DATABASE_URL=
+
+    # Azure Blob Storage (File Storage)
+    AZURE_STORAGE_CONNECTION_STRING=
 
     # AI Providers (OpenRouter is recommended)
     OPENROUTER_API_KEY=
-    
+    GOOGLE_GENERATIVE_AI_API_KEY=
+    GROQ_API_KEY=
+    ANTHROPIC_API_KEY=
+
+    # Firecrawl (Web Scraping)
+    FIRECRAWL_API_KEY=
+
+    # Upstash Redis (Caching)
+    UPSTASH_REDIS_REST_URL=
+    UPSTASH_REDIS_REST_TOKEN=
+
+    # Razorpay (Payments — optional)
+    RAZORPAY_KEY_ID=
+    RAZORPAY_KEY_SECRET=
+    RAZORPAY_WEBHOOK_SECRET=
+
+    # E2B (Code Sandbox)
+    E2B_API_KEY=
+
     # Inngest
     INNGEST_EVENT_KEY=
     INNGEST_SIGNING_KEY=
     ```
 
-4.  **Run the development server**
-    You need to run three processes (concurrently or in separate terminals):
+    > 📖 For detailed instructions on setting up each service, see [README-API-KEYS.md](./README-API-KEYS.md).
+
+4.  **Run the database migration**
+    ```bash
+    npx prisma migrate dev --name init
+    ```
+
+5.  **Run the development server**
+    You need to run two processes (concurrently or in separate terminals):
 
     ```bash
     # 1. Next.js App
     npm run dev
 
-    # 2. Convex Backend
-    npx convex dev
-
-    # 3. Inngest Dev Server
+    # 2. Inngest Dev Server
     npx inngest-cli@latest dev
     ```
 
-5.  **Open the App**
+6.  **Open the App**
     Visit `http://localhost:3000` to start building!
 
 ## 🤝 Contributing
